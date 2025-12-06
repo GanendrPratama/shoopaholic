@@ -1,19 +1,30 @@
-# 1. Use an official lightweight Python image
+# 1. Use Python 3.11 Slim (Lightweight)
 FROM python:3.11-slim
 
-# 2. Set the working directory inside the container
+# 2. Set working directory
 WORKDIR /code
 
-# 3. Copy requirements first to leverage Docker cache
+# 3. Install system dependencies (Required for some Python packages)
+# We clean up apt lists afterwards to keep the image small
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# 4. Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# 5. Copy requirements
 COPY requirements.txt .
 
-# 4. Install dependencies
-# We use --no-cache-dir to keep the image size small
+# 6. CRITICAL FIX: Install CPU-only PyTorch first
+# This prevents downloading the massive 800MB+ GPU version
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# 7. Install the rest of the dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Copy the rest of the application code (app folder, frontend folder, .env)
+# 8. Copy application code
 COPY . .
 
-# 6. Command to run the app
-# We use ${PORT:-8000} to use Render's dynamic port, or default to 8000 locally
+# 9. Run the app
 CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
