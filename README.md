@@ -1,50 +1,48 @@
-🛍️ Shoopaholic
+# 🛍️ Shoopaholic
 
 Shoopaholic is an intelligent, RAG-powered (Retrieval-Augmented Generation) shop assistant designed to bridge the gap between static shop data and dynamic customer queries.
 
-It uses a Hybrid AI Architecture: simple, cost-effective local embeddings for searching through shop data, combined with a powerful Cloud LLM (via Kolosal AI) to generate natural, human-like answers.
+It uses a **Hybrid AI Architecture**: simple, cost-effective local embeddings for searching through shop data, combined with a powerful Cloud LLM (via Kolosal AI) to generate natural, human-like answers.
 
-🚀 Features
+---
 
-- Hybrid RAG System: Uses local HuggingFace models for privacy and speed during retrieval, and a Cloud LLM for intelligent answer generation.
+## 🚀 Features
 
-- Admin Dashboard: Simple interface for shop owners to paste product catalogs, promotions, and policy updates instantly.
+- **Hybrid RAG System**: Uses local HuggingFace models for privacy and speed during retrieval, and a Cloud LLM for intelligent answer generation.
+- **Single-Server Deployment**: FastAPI serves both the REST API and the static Frontend files. No need to run separate web servers.
+- **Dual Interface**:
+    - **Admin Dashboard**: For shop owners to manage inventory, update policies, and sync data to the AI.
+    - **Customer Chat**: A clean, separate interface for customers to interact with the assistant.
+- **Visual Responses**: The AI can intelligently surface product images directly in the chat.
+- **Context-Aware**: The AI only answers based on the provided shop data, reducing hallucinations.
 
-- Context-Aware: The AI only answers based on the provided shop data, reducing hallucinations.
+---
 
-- Modular Codebase: Organized architecture separating the API client, RAG engine, and server logic.
+## 🛠️ Tech Stack
 
-- Cost-Effective: Retrieval happens locally (free), minimizing API costs to only the final answer generation.
+- **Backend**: Python, FastAPI (API + Static File Serving)
+- **Frontend**: HTML5, CSS3, Vanilla JavaScript (No build tools required)
+- **Retrieval Engine**: LlamaIndex + HuggingFace (BAAI/bge-small-en-v1.5) - Runs Locally
+- **Generation Engine**: Kolosal AI (Llama 4 Maverick) - Accessed via direct REST API
+- **Vector Store**: Local file persistence (LlamaIndex Storage)
 
-🛠️ Tech Stack
+---
 
-- Backend: Python, FastAPI
-
-- Frontend: HTML5, CSS3, Vanilla JavaScript
-
-- AI Framework: LlamaIndex (for Vector Store & Retrieval)
-
-- Embeddings: HuggingFace (BAAI/bge-small-en-v1.5) - Runs Locally
-
-- LLM Service: Kolosal AI (Llama 4 Maverick) - Accessed via standard REST API
-
-- Vector Store: Local file persistence (LlamaIndex Storage)
-
-📋 Prerequisites
+## 📋 Prerequisites
 
 - Python 3.9 or higher
-
 - A Kolosal AI API Key
 
-⚡ Quickstart Guide
+---
 
-1. Clone & Setup
+## ⚡ Quickstart Guide
 
-```
+### 1. Clone & Setup
+
+```bash
 # Clone the repository
 git clone https://github.com/yourusername/shoopaholic.git
 cd shoopaholic
-
 
 # Create a virtual environment (Recommended)
 python -m venv venv
@@ -55,74 +53,82 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-
 ```
 
+### 2. Configure Environment
 
-2. Configure Environment
+Create a `.env` file in the root directory and add your API key:
 
-Create a .env file in the root directory (next to requirements.txt) and add your API key:
-```
+```env
 KOLOSAI_API_KEY=your_actual_api_key_here
 ```
 
-3. Run the Application
+### 3. Run the Application
 
-You need two terminal windows open to run the full stack.
+You only need one terminal to run the full stack.
 
-Terminal 1: Start the Backend (The Brain)
 ```bash
 # Run from the root folder
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Terminal 2: Start the Frontend (The UI)
-```bash
-cd frontend
-python -m http.server 5500
-```
+### 4. Access the App
 
-4. Access the App
+Open your browser to the following URLs:
 
-Open your browser and navigate to:
-👉 http://localhost:5500
+- **Admin Dashboard**: [http://localhost:8000/admin/](http://localhost:8000/admin/)
+- **Customer Chat**: [http://localhost:8000/chat/](http://localhost:8000/chat/)
 
-📂 Project Structure
-```
+---
+
+## 📂 Project Structure
+
+```plaintext
 shoopaholic/
 ├── .env                  # API Keys (Do not commit this!)
 ├── requirements.txt      # Python dependencies
 ├── app/                  # Backend Application Source
-│   ├── __init__.py       # Package marker
+│   ├── __init__.py
 │   ├── config.py         # Config & Env loading
 │   ├── schemas.py        # Pydantic Data Models
 │   ├── rag_engine.py     # LlamaIndex Retrieval Logic
-│   ├── llm_client.py     # Direct API Client (Curl wrapper)
-│   └── main.py           # FastAPI Server Endpoints
+│   ├── llm_client.py     # Direct API Client (Kolosal wrapper)
+│   └── main.py           # FastAPI Server & Static File Mounts
 └── frontend/             # Frontend Source
-    └── index.html        # Single-page UI
+        ├── admin/            # Admin Interface
+        │   ├── index.html
+        │   └── style.css
+        └── chat/             # Customer Interface
+                ├── index.html
+                └── style.css
 ```
 
-📖 How to Use
+---
 
-For Shop Owners (Admin Panel - Left Side):
+## 📖 How to Use
 
-Paste your product list, prices, and current promotions into the text area.
+### Setup Shop (Admin):
 
-Click "Update Knowledge Base".
+1. Go to `/admin/`.
+2. Enter your Shop Name and Policies.
+3. Add products with names, prices, and Image URLs.
+4. **Crucial**: Click "✨ Sync Knowledge to AI". This builds the local vector index.
 
-Wait for the success message. The AI has now indexed your data locally into a vector store.
+### Test Experience (Chat):
 
-For Customers (Chat Panel - Right Side):
+1. Go to `/chat/`.
+2. Ask questions like:
+     - "Do you have any red shoes?"
+     - "What are your hours?"
+3. If you added image URLs to your products, the bot will display them in the chat.
 
-Ask questions like "Do you have any running shoes?" or "What is your return policy?".
+---
 
-The bot will search your local index, find relevant context, and send it to Llama 4 Maverick to generate a helpful response.
+## 📦 Requirements
 
-📦 Recommended Requirements
+Ensure your `requirements.txt` contains:
 
-Ensure your requirements.txt contains the following:
-```
+```plaintext
 fastapi
 uvicorn
 python-dotenv

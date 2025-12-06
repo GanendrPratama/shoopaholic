@@ -1,17 +1,22 @@
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles # New import for serving HTML
 from .schemas import ChatRequest, AdminUpdateRequest
 from .rag_engine import retrieve_context, rebuild_index
 from .llm_client import call_kolosal_api
 
 app = FastAPI()
 
+# CORS is still good to keep, though less critical if serving from same origin
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- API Endpoints (Must be defined BEFORE static files) ---
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
@@ -41,3 +46,16 @@ async def update_knowledge(request: AdminUpdateRequest):
         return {"status": "success", "message": "Knowledge base updated successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- Static File Serving ---
+# We calculate the path to the 'frontend' folder relative to this file
+# This allows us to serve the HTML/CSS/JS directly
+current_dir = os.path.dirname(os.path.abspath(__file__))
+frontend_dir = os.path.join(os.path.dirname(current_dir), "frontend")
+
+# Mount the frontend directory to the root "/"
+# html=True allows visiting /admin/ to automatically find /admin/index.html
+if os.path.exists(frontend_dir):
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="static")
+else:
+    print("⚠️ Warning: Frontend directory not found. Creating server without UI.")
