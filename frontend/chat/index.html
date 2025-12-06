@@ -5,16 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Support</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Link to the local style.css in the chat folder -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="chat.css">
 </head>
 <body>
 
 <div class="chat-window">
     <div class="header">
         <h3 id="shop-title">Shop Assistant</h3>
-        <!-- UPDATED LINK: Points to the admin directory -->
-        <a href="../admin/" class="admin-link">Admin Login</a>
+        <a href="admin.html" class="admin-link">Admin Login</a>
     </div>
     
     <div class="messages" id="history">
@@ -30,6 +28,7 @@
 <script>
     const API_URL = "http://localhost:8000";
 
+    // Load shop name from local storage just for the header title
     const shopInfo = JSON.parse(localStorage.getItem('shopInfo'));
     if(shopInfo && shopInfo.name) {
         document.getElementById('shop-title').innerText = shopInfo.name + " Support";
@@ -43,10 +42,12 @@
         const history = document.getElementById('history');
         const btn = document.getElementById('send-btn');
 
+        // 1. User Message
         history.innerHTML += `<div class="msg user">${text}</div>`;
         input.value = '';
         history.scrollTop = history.scrollHeight;
 
+        // 2. Loading State
         const loadId = 'loading-' + Date.now();
         history.innerHTML += `<div id="${loadId}" class="msg bot">...</div>`;
         history.scrollTop = history.scrollHeight;
@@ -60,8 +61,10 @@
             });
             const data = await res.json();
             
+            // 3. Render Bot Response
             document.getElementById(loadId).remove();
             
+            // Convert URLs to Images
             let formattedHtml = data.answer.replace(
                 /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp))/gi, 
                 '<img src="$1" alt="Product Image">'
