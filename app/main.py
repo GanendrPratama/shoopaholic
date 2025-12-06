@@ -1,14 +1,21 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles # New import for serving HTML
+from fastapi.staticfiles import StaticFiles
 from .schemas import ChatRequest, AdminUpdateRequest
 from .rag_engine import retrieve_context, rebuild_index
 from .llm_client import call_kolosal_api
+from .analytics import init_db, log_query, get_analytics_data, generate_recommendations
 
 app = FastAPI()
 
-# CORS is still good to keep, though less critical if serving from same origin
+# Initialize DB on startup
+init_db()
+
+# Global variable to store current shop text for recommendation logic
+# In a real app, this would be in a database, but memory is fine for this scale.
+current_shop_context = "" 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,46 +23,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- API Endpoints (Must be defined BEFORE static files) ---
-
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
     try:
-        # 1. Retrieve relevant info from local DB
-        context_text = retrieve_context(request.query)
-        
-        if not context_text:
-            return {"answer": "I don't have any shop information yet. Please ask the admin to upload data."}
+        # 1. Log the query for analytics
+        log_query(request.query)
 
-        # 2. Send context + question to Cloud LLM
+        # 2. Retrieve context
+        context_text = retrieve_context(request.query)
+        if not context_text:
+            return {"answer": "I don't have that information. Please contact the owner."}
+
+        # 3. Generate Answer
         answer = call_kolosal_api(context_text, request.query)
-        
         return {"answer": answer}
 
     except Exception as e:
         print(f"❌ Error: {str(e)}")
-        return {"answer": f"System Error: {str(e)}"}
+        return {"answer": "Sorry, I'm having trouble connecting to the brain."}
 
 @app.post("/admin/update_knowledge")
 async def update_knowledge(request: AdminUpdateRequest):
+    global current_shop_context
     if not request.shop_data_text.strip():
          raise HTTPException(status_code=400, detail="Data cannot be empty")
 
     try:
+        # Save text to memory for recommendation engine to check against
+        current_shop_context = request.shop_data_text
+        
         rebuild_index(request.shop_data_text)
-        return {"status": "success", "message": "Knowledge base updated successfully."}
+        return {"status": "success", "message": "Knowledge updated!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- Static File Serving ---
-# We calculate the path to the 'frontend' folder relative to this file
-# This allows us to serve the HTML/CSS/JS directly
+# --- NEW ANALYTICS ENDPOINTS ---
+
+@app.get("/admin/analytics")
+async def get_stats():
+    return get_analytics_data()
+
+@app.get("/admin/recommendations")
+async def get_suggestions():
+    return {"msgs": generate_recommendations(current_shop_context)}
+
+# --- Static Files ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(os.path.dirname(current_dir), "frontend")
-
-# Mount the frontend directory to the root "/"
-# html=True allows visiting /admin/ to automatically find /admin/index.html
 if os.path.exists(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="static")
-else:
-    print("⚠️ Warning: Frontend directory not found. Creating server without UI.")
