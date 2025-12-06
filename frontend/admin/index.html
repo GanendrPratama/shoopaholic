@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop Admin - Shoopaholic</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Link to the local style.css in the admin folder -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+    <div class="nav-header">
+        <h2>🛠️ Shop Manager</h2>
+        <!-- UPDATED LINK: Points to the chat directory -->
+<<<<<<< HEAD
+=======
+         <a href="../" class="link-btn">← Back to Home</a>
+
+>>>>>>> 2b59356 (landing page)
+        <a href="../chat/" class="link-btn">Go to Customer Chat &rarr;</a>
+    </div>
+
+    <!-- Left Column: Forms -->
+    <div class="card">
+        <h3>Shop Settings</h3>
+        <div class="form-group">
+            <label>Shop Name</label>
+            <input type="text" id="shop-name" placeholder="e.g. Benny's Boutique">
+        </div>
+        <div class="form-group">
+            <label>Policies / Hours</label>
+            <textarea id="shop-policy" rows="2" placeholder="Open 9-5. No returns."></textarea>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+        <h3>Add Product</h3>
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="p-name">
+        </div>
+        <div class="form-group">
+            <label>Price</label>
+            <input type="text" id="p-price" placeholder="$0.00">
+        </div>
+        <div class="form-group">
+            <label>Image URL</label>
+            <input type="text" id="p-img" placeholder="https://example.com/item.jpg">
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea id="p-desc" rows="2"></textarea>
+        </div>
+        <button class="btn-primary" onclick="addProduct()">Add Product</button>
+
+        <button class="btn-success" onclick="syncToAI()">✨ Sync Knowledge to AI</button>
+        <div id="status-msg" style="text-align: center; margin-top: 10px; font-size: 0.9rem; color: green; min-height: 20px;"></div>
+    </div>
+
+    <!-- Right Column: Product Grid -->
+    <div>
+        <h3 style="margin-bottom: 15px;">Inventory</h3>
+        <div class="product-list" id="inventory">
+            <!-- Items injected here -->
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = "http://localhost:8000";
+    let products = JSON.parse(localStorage.getItem('products')) || [];
+    let shopInfo = JSON.parse(localStorage.getItem('shopInfo')) || { name: "", policy: "" };
+
+    window.onload = () => {
+        document.getElementById('shop-name').value = shopInfo.name;
+        document.getElementById('shop-policy').value = shopInfo.policy;
+        render();
+    };
+
+    function addProduct() {
+        const name = document.getElementById('p-name').value;
+        const price = document.getElementById('p-price').value;
+        const img = document.getElementById('p-img').value;
+        const desc = document.getElementById('p-desc').value;
+
+        if(!name || !price) return alert("Name and Price are required");
+
+        products.push({ id: Date.now(), name, price, img, desc });
+        save();
+        render();
+        
+        // Clear product inputs only
+        ['p-name', 'p-price', 'p-img', 'p-desc'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    function remove(id) {
+        products = products.filter(p => p.id !== id);
+        save();
+        render();
+    }
+
+    function save() {
+        shopInfo.name = document.getElementById('shop-name').value;
+        shopInfo.policy = document.getElementById('shop-policy').value;
+        
+        localStorage.setItem('products', JSON.stringify(products));
+        localStorage.setItem('shopInfo', JSON.stringify(shopInfo));
+    }
+
+    function render() {
+        const grid = document.getElementById('inventory');
+        grid.innerHTML = products.map(p => `
+            <div class="product-card">
+                <button class="delete-btn" onclick="remove(${p.id})">&times;</button>
+                <img src="${p.img || 'https://placehold.co/300x200?text=No+Image'}" class="product-img" onerror="this.src='https://placehold.co/300x200?text=Error'">
+                <div class="product-info">
+                    <div style="font-weight:600">${p.name}</div>
+                    <div style="color:#2563eb; font-weight:700">${p.price}</div>
+                    <div style="font-size:0.85rem; color:#666; margin-top:5px">${p.desc}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function syncToAI() {
+        save(); 
+        const btn = document.querySelector('.btn-success');
+        const status = document.getElementById('status-msg');
+        
+        let textBlob = `SHOP INFO:\nName: ${shopInfo.name}\nPolicies: ${shopInfo.policy}\n\nCATALOG:\n`;
+        products.forEach(p => {
+            textBlob += `--- \nItem: ${p.name}\nPrice: ${p.price}\nDetails: ${p.desc}\nImage: ${p.img || 'None'}\n`;
+        });
+
+        btn.disabled = true;
+        btn.innerText = "Syncing...";
+        status.innerText = "";
+
+        try {
+            const res = await fetch(`${API_URL}/admin/update_knowledge`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ shop_data_text: textBlob })
+            });
+            if (res.ok) status.innerText = "✅ AI Successfully Updated!";
+            else status.innerText = "❌ Error updating AI.";
+        } catch (e) {
+            status.innerText = "❌ Network connection failed.";
+        }
+        
+        btn.disabled = false;
+        btn.innerText = "✨ Sync Knowledge to AI";
+    }
+</script>
+</body>
+</html>

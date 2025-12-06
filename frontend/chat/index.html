@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Support</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Link to the local style.css in the chat folder -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="chat-window">
+    <div class="header">
+        <h3 id="shop-title">Shop Assistant</h3>
+        <!-- UPDATED LINK: Points to the admin directory -->
+<<<<<<< HEAD
+=======
+         <a href="../" class="link-btn">← Back to Home</a>
+>>>>>>> 2b59356 (landing page)
+        <a href="../admin/" class="admin-link">Admin Login</a>
+    </div>
+    
+    <div class="messages" id="history">
+        <div class="msg bot">Hello! How can I help you today?</div>
+    </div>
+    
+    <div class="input-area">
+        <input type="text" id="query" placeholder="Ask about products..." onkeypress="if(event.key==='Enter') send()">
+        <button onclick="send()" id="send-btn">➤</button>
+    </div>
+</div>
+
+<script>
+    const API_URL = "http://localhost:8000";
+
+    const shopInfo = JSON.parse(localStorage.getItem('shopInfo'));
+    if(shopInfo && shopInfo.name) {
+        document.getElementById('shop-title').innerText = shopInfo.name + " Support";
+    }
+
+    async function send() {
+        const input = document.getElementById('query');
+        const text = input.value.trim();
+        if(!text) return;
+
+        const history = document.getElementById('history');
+        const btn = document.getElementById('send-btn');
+
+        history.innerHTML += `<div class="msg user">${text}</div>`;
+        input.value = '';
+        history.scrollTop = history.scrollHeight;
+
+        const loadId = 'loading-' + Date.now();
+        history.innerHTML += `<div id="${loadId}" class="msg bot">...</div>`;
+        history.scrollTop = history.scrollHeight;
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`${API_URL}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: text })
+            });
+            const data = await res.json();
+            
+            document.getElementById(loadId).remove();
+            
+            let formattedHtml = data.answer.replace(
+                /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp))/gi, 
+                '<img src="$1" alt="Product Image">'
+            );
+            
+            history.innerHTML += `<div class="msg bot">${formattedHtml}</div>`;
+
+        } catch (e) {
+            document.getElementById(loadId).innerText = "Error connecting to shop server.";
+        } finally {
+            history.scrollTop = history.scrollHeight;
+            btn.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>

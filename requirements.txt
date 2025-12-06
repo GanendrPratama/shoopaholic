@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-dotenv
+requests
+llama-index-core
+llama-index-embeddings-huggingface
+llama-index-readers-file
+torch
+sentence-transformers
+protobuf
