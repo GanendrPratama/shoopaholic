@@ -5,3 +5,7 @@ class ChatRequest(BaseModel):
 
 class AdminUpdateRequest(BaseModel):
     shop_data_text: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
