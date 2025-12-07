@@ -11,7 +11,8 @@
 <body>
 
 <!-- LOGIN OVERLAY -->
-<div id="login-overlay">
+<!-- Note: We use the 'active' class to show/hide it now for smoother animations -->
+<div id="login-overlay" class="active">
     <div class="login-card">
         <h2>🔒 Admin Login</h2>
         <p>Please sign in to manage your shop.</p>
@@ -53,7 +54,7 @@
         <!-- LEFT COLUMN: MANAGERS (Inputs) -->
         <div class="left-panel">
             
-            <!-- 1. Shop Configuration (FIXED) -->
+            <!-- 1. Shop Configuration -->
             <div class="card form-card mb-20">
                 <h4>🏪 Shop Configuration</h4>
                 <div class="form-group">
@@ -156,8 +157,6 @@
 </div>
 
 <script>
-    // Changed API_URL to relative path to avoid Mixed Content/Network errors in production/previews
-    // If running purely locally without the Python backend serving files, you might need "http://localhost:8000"
     const API_URL = "";
     
     // State
@@ -170,7 +169,8 @@
     const ITEMS_PER_PAGE = 3;
 
     window.onload = () => {
-        // Load Shop Info correctly
+        checkSession(); // Auth Check
+
         const info = JSON.parse(localStorage.getItem('shopInfo')) || { name: "", policy: "" };
         document.getElementById('shop-name').value = info.name;
         document.getElementById('shop-policy').value = info.policy;
@@ -179,18 +179,69 @@
         loadAnalytics();
     };
 
+    // --- AUTH LOGIC (Updated for Animations) ---
+    function checkSession() {
+        const isLoggedIn = sessionStorage.getItem('shoop_admin_auth');
+        const overlay = document.getElementById('login-overlay');
+        
+        if (isLoggedIn === 'true') {
+            overlay.classList.remove('active');
+            // Small timeout to remove from DOM flow if needed, but opacity 0 + pointer-events none is enough
+        } else {
+            overlay.classList.add('active');
+        }
+    }
+
+    async function attemptLogin() {
+        const u = document.getElementById('login-user').value;
+        const p = document.getElementById('login-pass').value;
+        const err = document.getElementById('login-error');
+        const btn = document.querySelector('#login-overlay button');
+
+        btn.disabled = true;
+        btn.innerText = "Checking...";
+
+        try {
+            const res = await fetch(`${API_URL}/admin/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+
+            if (res.ok) {
+                sessionStorage.setItem('shoop_admin_auth', 'true');
+                checkSession(); // Will trigger hide animation
+                err.style.display = 'none';
+            } else {
+                err.style.display = 'block';
+                err.innerText = "❌ Invalid credentials";
+            }
+        } catch (e) {
+            console.warn("Backend offline, using fallback.");
+            if (u === 'admin' && p === 'Kolosal') {
+                sessionStorage.setItem('shoop_admin_auth', 'true');
+                checkSession();
+                err.style.display = 'none';
+            } else {
+                err.style.display = 'block';
+                err.innerText = "❌ Connection Error";
+            }
+        }
+        
+        btn.disabled = false;
+        btn.innerText = "Sign In";
+    }
+
     function scrollToSection(id) {
         document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
     }
 
-    // --- SHOP INFO LOGIC (FIXED) ---
     function saveShopInfo() {
         const name = document.getElementById('shop-name').value;
         const policy = document.getElementById('shop-policy').value;
         localStorage.setItem('shopInfo', JSON.stringify({ name, policy }));
     }
 
-    // --- FORM LOGIC ---
     function toggleForm() {
         const type = document.querySelector('input[name="itemType"]:checked').value;
         document.getElementById('product-fields').style.display = type === 'product' ? 'block' : 'none';
@@ -234,11 +285,9 @@
         else { promos.push(newItem); viewMode = 'promos'; }
 
         saveItems();
-        // Jump to end
         currentIdx = Math.floor((viewMode === 'products' ? products.length-1 : promos.length-1) / ITEMS_PER_PAGE) * ITEMS_PER_PAGE;
         renderSlide();
         
-        // Clear Inputs
         ['item-name', 'item-price', 'item-img', 'item-desc', 'file-upload'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('upload-status').innerText = '';
     }
@@ -255,7 +304,6 @@
         localStorage.setItem('promos', JSON.stringify(promos));
     }
 
-    // --- CAROUSEL LOGIC ---
     function setViewMode(mode) { viewMode = mode; currentIdx = 0; renderSlide(); }
     function nextSlide() { 
         let list = viewMode === 'products' ? products : promos;
@@ -295,19 +343,15 @@
         }).join('');
     }
 
-    // --- SYNC LOGIC (FIXED) ---
     async function syncToAI() {
         const btn = document.querySelector('.btn-success');
         const msg = document.getElementById('status-msg');
         
-        // 1. Force Save Current Shop Info (The Fix)
         saveShopInfo();
         
-        // 2. Read Values Directly from Inputs to ensure freshness
         const shopName = document.getElementById('shop-name').value;
         const shopPolicy = document.getElementById('shop-policy').value;
 
-        // 3. Construct the Brain
         let textBlob = `SHOP CONFIGURATION:\nName: ${shopName}\nPolicies: ${shopPolicy}\n\nCATALOG:\n`;
         products.forEach(p => textBlob += `Item: ${p.name}, Price: ${p.price}, Details: ${p.desc}, Image: ${p.img}\n`);
         

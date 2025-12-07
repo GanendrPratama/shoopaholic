@@ -1,15 +1,18 @@
-# 🛍️ Shoopaholic
+🛍️ Shoopaholic
 
 Shoopaholic is an intelligent, RAG-powered (Retrieval-Augmented Generation) shop assistant designed to bridge the gap between static shop data and dynamic customer queries.
 
 It uses a **Hybrid AI Architecture**: simple, cost-effective local embeddings for searching through shop data, combined with a powerful Cloud LLM (via Kolosal AI) to generate natural, human-like answers.
 
+**Live Demo**: [Shoopaholic Demo](https://shoopaholic-production.up.railway.app/)
+
 ---
 
 ## 🚀 Features
 
-- **Hybrid RAG System**: Uses local HuggingFace models for privacy and speed during retrieval, and a Cloud LLM for intelligent answer generation.
-- **Single-Server Deployment**: FastAPI serves both the REST API and the static Frontend files. No need to run separate web servers.
+- **Hybrid RAG System**: Combines local HuggingFace models for privacy and speed during retrieval with a Cloud LLM for intelligent answer generation.
+- **Secure Admin Dashboard**: Protected by a login system, allowing shop owners to manage inventory, update policies, and view analytics safely.
+- **Single-Server Deployment**: FastAPI serves both the REST API and the static frontend files, eliminating the need for separate web servers.
 - **Dual Interface**:
     - **Admin Dashboard**: For shop owners to manage inventory, update policies, and sync data to the AI.
     - **Customer Chat**: A clean, separate interface for customers to interact with the assistant.
@@ -57,11 +60,15 @@ pip install -r requirements.txt
 
 ### 2. Configure Environment
 
-Create a `.env` file in the root directory and add your API key:
+Create a `.env` file in the root directory and add your API key and admin credentials:
 
 ```env
 KOLOSAI_API_KEY=your_actual_api_key_here
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=Kolosal
 ```
+
+> **Note**: If you do not set a username/password, it defaults to `admin` / `Kolosal`.
 
 ### 3. Run the Application
 
@@ -74,8 +81,6 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ### 4. Access the App
 
-Open your browser to the following URLs:
-
 - **Admin Dashboard**: [http://localhost:8000/admin/](http://localhost:8000/admin/)
 - **Customer Chat**: [http://localhost:8000/chat/](http://localhost:8000/chat/)
 
@@ -85,7 +90,7 @@ Open your browser to the following URLs:
 
 ```plaintext
 shoopaholic/
-├── .env                  # API Keys (Do not commit this!)
+├── .env                  # API Keys & Credentials (Do not commit this!)
 ├── requirements.txt      # Python dependencies
 ├── app/                  # Backend Application Source
 │   ├── __init__.py
@@ -107,14 +112,15 @@ shoopaholic/
 
 ## 📖 How to Use
 
-### Setup Shop (Admin):
+### Setup Shop (Admin)
 
 1. Go to `/admin/`.
-2. Enter your Shop Name and Policies.
-3. Add products with names, prices, and Image URLs.
-4. **Crucial**: Click "✨ Sync Knowledge to AI". This builds the local vector index.
+2. Login using the credentials set in your `.env` file.
+3. Enter your Shop Name and Policies.
+4. Add products with names, prices, and Image URLs.
+5. **Crucial**: Click "✨ Sync Knowledge to AI". This builds the local vector index.
 
-### Test Experience (Chat):
+### Test Experience (Chat)
 
 1. Go to `/chat/`.
 2. Ask questions like:
