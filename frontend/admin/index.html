@@ -13,8 +13,8 @@
 <div class="sidebar">
     <h2>🛍️ Shoopaholic</h2>
     <nav>
-        <button onclick="scrollToTop()">🛠️ Manager</button>
-        <button onclick="scrollToAnalytics()">📊 Analytics</button>
+        <button onclick="scrollToSection('manager-section')">🛠️ Manager</button>
+        <button onclick="scrollToSection('analytics-section')">📊 Analytics</button>
     </nav>
     <div style="margin-top: auto; padding: 20px;">
         <a href="../chat/" class="link-btn" target="_blank">Open Customer Chat ↗</a>
@@ -29,22 +29,22 @@
         <button class="btn-success" onclick="syncToAI()">✨ Sync All to AI</button>
     </div>
 
-    <!-- MAIN SPLIT VIEW (Manager vs Inventory) -->
-    <div class="split-layout">
+    <!-- MAIN SPLIT VIEW -->
+    <div id="manager-section" class="split-layout">
         
         <!-- LEFT COLUMN: MANAGERS (Inputs) -->
         <div class="left-panel">
             
-            <!-- 1. Shop Configuration -->
+            <!-- 1. Shop Configuration (FIXED) -->
             <div class="card form-card mb-20">
                 <h4>🏪 Shop Configuration</h4>
                 <div class="form-group">
                     <label>Shop Name</label>
-                    <input type="text" id="shop-name" placeholder="e.g. Benny's Boutique">
+                    <input type="text" id="shop-name" placeholder="e.g. Benny's Boutique" oninput="saveShopInfo()">
                 </div>
                 <div class="form-group">
                     <label>Policies / Opening Hours</label>
-                    <textarea id="shop-policy" placeholder="Open 9-5. No returns on socks."></textarea>
+                    <textarea id="shop-policy" placeholder="Open 9-5. No returns on socks." oninput="saveShopInfo()"></textarea>
                 </div>
             </div>
 
@@ -68,7 +68,6 @@
                     <input type="text" id="item-name">
                 </div>
                 
-                <!-- Conditional Fields -->
                 <div id="product-fields">
                     <div class="form-group">
                         <label>Price</label>
@@ -85,11 +84,18 @@
                     <textarea id="item-desc"></textarea>
                 </div>
                 
-                <button class="btn-primary" onclick="addItem()">Add Item</button>
+                <!-- File Upload Helper -->
+                <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
+                    <label style="font-size:0.8rem; color:#666;">Auto-fill from file (PDF/Image):</label>
+                    <input type="file" id="file-upload" onchange="uploadFile()" style="font-size:0.8rem;">
+                    <div id="upload-status" style="font-size:0.8rem; color:green;"></div>
+                </div>
+
+                <button class="btn-primary" style="margin-top:15px;" onclick="addItem()">Add Item</button>
             </div>
         </div>
         
-        <!-- RIGHT COLUMN: INVENTORY (Display) -->
+        <!-- RIGHT COLUMN: INVENTORY CAROUSEL -->
         <div class="right-panel">
             <div class="card carousel-container">
                 <div class="carousel-tabs">
@@ -97,8 +103,8 @@
                     <button id="tab-promo" onclick="setViewMode('promos')">Promos (<span id="count-promo">0</span>)</button>
                 </div>
 
-                <div id="slide-view" class="slide-view">
-                    <!-- Injected JS Content -->
+                <div id="slide-view" class="slide-grid">
+                    <!-- Grid Content -->
                 </div>
 
                 <div class="carousel-controls">
@@ -110,7 +116,7 @@
     </div>
     <div id="status-msg"></div>
 
-    <!-- SECTION 3: ANALYTICS (With Padding) -->
+    <!-- ANALYTICS SECTION -->
     <div id="analytics-section" class="section">
         <h3>Insights & Recommendations</h3>
         <div class="analytics-grid">
@@ -137,123 +143,109 @@
     // State
     let products = JSON.parse(localStorage.getItem('products')) || [];
     let promos = JSON.parse(localStorage.getItem('promos')) || [];
-    let shopInfo = JSON.parse(localStorage.getItem('shopInfo')) || { name: "", policy: "" };
     
     // UI State
     let currentIdx = 0;
-    let viewMode = 'products'; // 'products' or 'promos'
+    let viewMode = 'products';
+    const ITEMS_PER_PAGE = 3;
 
     window.onload = () => {
-        document.getElementById('shop-name').value = shopInfo.name;
-        document.getElementById('shop-policy').value = shopInfo.policy;
-        
-        // Auto-save shop details
-        ['shop-name', 'shop-policy'].forEach(id => {
-            document.getElementById(id).addEventListener('input', () => {
-                shopInfo.name = document.getElementById('shop-name').value;
-                shopInfo.policy = document.getElementById('shop-policy').value;
-                localStorage.setItem('shopInfo', JSON.stringify(shopInfo));
-            });
-        });
+        // Load Shop Info correctly
+        const info = JSON.parse(localStorage.getItem('shopInfo')) || { name: "", policy: "" };
+        document.getElementById('shop-name').value = info.name;
+        document.getElementById('shop-policy').value = info.policy;
 
         renderSlide();
         loadAnalytics();
     };
 
-    function scrollToTop() {
-        document.querySelector('.main-content').scrollTo({ top: 0, behavior: 'smooth' });
+    function scrollToSection(id) {
+        document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
     }
 
-    function scrollToAnalytics() {
-        document.getElementById('analytics-section').scrollIntoView({ behavior: 'smooth' });
+    // --- SHOP INFO LOGIC (FIXED) ---
+    function saveShopInfo() {
+        const name = document.getElementById('shop-name').value;
+        const policy = document.getElementById('shop-policy').value;
+        localStorage.setItem('shopInfo', JSON.stringify({ name, policy }));
     }
 
     // --- FORM LOGIC ---
     function toggleForm() {
         const type = document.querySelector('input[name="itemType"]:checked').value;
-        const prodFields = document.getElementById('product-fields');
-        const title = document.getElementById('form-title');
+        document.getElementById('product-fields').style.display = type === 'product' ? 'block' : 'none';
+        document.getElementById('form-title').innerText = type === 'product' ? "Add New Product" : "Add New Promotion";
+    }
 
-        if (type === 'product') {
-            prodFields.style.display = 'block';
-            title.innerText = "Add New Product";
-        } else {
-            prodFields.style.display = 'none';
-            title.innerText = "Add New Promotion";
-        }
+    async function uploadFile() {
+        const fileInput = document.getElementById('file-upload');
+        const status = document.getElementById('upload-status');
+        if(fileInput.files.length === 0) return;
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+        status.innerText = "Reading file...";
+
+        try {
+            const res = await fetch(`${API_URL}/admin/upload_file`, { method: 'POST', body: formData });
+            const data = await res.json();
+            if(data.status === 'success') {
+                document.getElementById('item-desc').value += "\n" + data.text;
+                status.innerText = "✅ Content added to description!";
+            } else { status.innerText = "❌ Failed to read."; }
+        } catch(e) { status.innerText = "❌ Upload Error."; }
     }
 
     function addItem() {
         const type = document.querySelector('input[name="itemType"]:checked').value;
         const name = document.getElementById('item-name').value;
-        const desc = document.getElementById('item-desc').value;
+        if (!name) return alert("Name required");
 
-        if (!name) return alert("Name/Title is required");
+        const newItem = {
+            id: Date.now(),
+            name: name,
+            title: name,
+            price: document.getElementById('item-price').value,
+            img: document.getElementById('item-img').value,
+            desc: document.getElementById('item-desc').value
+        };
 
-        if (type === 'product') {
-            products.push({
-                id: Date.now(),
-                name,
-                price: document.getElementById('item-price').value,
-                img: document.getElementById('item-img').value,
-                desc
-            });
-            viewMode = 'products';
-        } else {
-            promos.push({
-                id: Date.now(),
-                title: name,
-                desc
-            });
-            viewMode = 'promos';
-        }
+        if(type === 'product') { products.push(newItem); viewMode = 'products'; }
+        else { promos.push(newItem); viewMode = 'promos'; }
 
-        save();
-        currentIdx = (viewMode === 'products' ? products.length : promos.length) - 1;
+        saveItems();
+        // Jump to end
+        currentIdx = Math.floor((viewMode === 'products' ? products.length-1 : promos.length-1) / ITEMS_PER_PAGE) * ITEMS_PER_PAGE;
         renderSlide();
         
         // Clear Inputs
-        document.getElementById('item-name').value = '';
-        document.getElementById('item-price').value = '';
-        document.getElementById('item-img').value = '';
-        document.getElementById('item-desc').value = '';
+        ['item-name', 'item-price', 'item-img', 'item-desc', 'file-upload'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('upload-status').innerText = '';
     }
 
-    function removeItem() {
+    function removeItem(realIdx) {
         let list = viewMode === 'products' ? products : promos;
-        if (list.length === 0) return;
-        
-        list.splice(currentIdx, 1);
-        if (currentIdx >= list.length) currentIdx = Math.max(0, list.length - 1);
-        
-        save();
+        list.splice(realIdx, 1);
+        saveItems();
         renderSlide();
+    }
+
+    function saveItems() {
+        localStorage.setItem('products', JSON.stringify(products));
+        localStorage.setItem('promos', JSON.stringify(promos));
     }
 
     // --- CAROUSEL LOGIC ---
-    function setViewMode(mode) {
-        viewMode = mode;
-        currentIdx = 0;
-        renderSlide();
-    }
-
-    function nextSlide() {
+    function setViewMode(mode) { viewMode = mode; currentIdx = 0; renderSlide(); }
+    function nextSlide() { 
         let list = viewMode === 'products' ? products : promos;
-        if (currentIdx < list.length - 1) {
-            currentIdx++;
-            renderSlide();
-        }
+        if (currentIdx + ITEMS_PER_PAGE < list.length) { currentIdx += ITEMS_PER_PAGE; renderSlide(); }
     }
-
-    function prevSlide() {
-        if (currentIdx > 0) {
-            currentIdx--;
-            renderSlide();
-        }
+    function prevSlide() { 
+        if (currentIdx > 0) { currentIdx -= ITEMS_PER_PAGE; renderSlide(); }
     }
 
     function renderSlide() {
-        // Update Tabs
         document.getElementById('tab-prod').className = viewMode === 'products' ? 'active' : '';
         document.getElementById('tab-promo').className = viewMode === 'promos' ? 'active' : '';
         document.getElementById('count-prod').innerText = products.length;
@@ -261,57 +253,44 @@
 
         const container = document.getElementById('slide-view');
         let list = viewMode === 'products' ? products : promos;
+        const visibleItems = list.slice(currentIdx, currentIdx + ITEMS_PER_PAGE);
 
-        if (list.length === 0) {
+        if (visibleItems.length === 0) {
             container.innerHTML = `<p class="empty-state">No items found.</p>`;
             return;
         }
 
-        const item = list[currentIdx];
-        
-        if (viewMode === 'products') {
-            const hasImg = item.img && item.img.length > 5;
-            container.innerHTML = `
-                <div class="slide-card fade-in">
-                    <div class="slide-img-container">
-                        ${hasImg ? `<img src="${item.img}" onerror="this.style.display='none'">` : '<div class="no-img">No Image</div>'}
-                    </div>
-                    <div class="slide-content">
-                        <h3>${item.name}</h3>
-                        <div class="slide-price">${item.price}</div>
-                        <p>${item.desc}</p>
-                        <button class="delete-btn-slide" onclick="removeItem()">Delete Product</button>
-                    </div>
-                    <div class="slide-counter">${currentIdx + 1} / ${products.length}</div>
+        container.innerHTML = visibleItems.map((item, idx) => {
+            const realIdx = currentIdx + idx;
+            const isPromo = viewMode === 'promos';
+            return `
+            <div class="grid-card ${isPromo ? 'promo-style' : ''}">
+                <button class="delete-btn-mini" onclick="removeItem(${realIdx})">&times;</button>
+                <div class="grid-content">
+                    <h4>${item.name || item.title}</h4>
+                    ${!isPromo ? `<div class="grid-price">${item.price}</div>` : ''}
+                    <p class="grid-desc">${item.desc.substring(0, 60)}...</p>
                 </div>
-            `;
-        } else {
-            container.innerHTML = `
-                <div class="slide-card fade-in promo-card-style">
-                    <div class="slide-content" style="text-align:center; padding: 40px; display:flex; flex-direction:column; justify-content:center; height:100%">
-                        <span style="font-size:3rem;">🏷️</span>
-                        <h3 style="color:#f59e0b; font-size: 1.5rem; margin: 10px 0;">${item.title}</h3>
-                        <p style="font-size: 1.2rem;">${item.desc}</p>
-                        <button class="delete-btn-slide" onclick="removeItem()">Delete Promo</button>
-                    </div>
-                    <div class="slide-counter">${currentIdx + 1} / ${promos.length}</div>
-                </div>
-            `;
-        }
+            </div>`;
+        }).join('');
     }
 
-    function save() {
-        localStorage.setItem('products', JSON.stringify(products));
-        localStorage.setItem('promos', JSON.stringify(promos));
-    }
-
-    // --- SYNC & ANALYTICS ---
+    // --- SYNC LOGIC (FIXED) ---
     async function syncToAI() {
         const btn = document.querySelector('.btn-success');
         const msg = document.getElementById('status-msg');
         
-        let textBlob = `SHOP INFO:\nName: ${shopInfo.name}\nPolicies: ${shopInfo.policy}\n\nCATALOG:\n`;
-        products.forEach(p => textBlob += `Product: ${p.name}, Price: ${p.price}, Details: ${p.desc}, Image: ${p.img}\n`);
+        // 1. Force Save Current Shop Info (The Fix)
+        saveShopInfo();
+        
+        // 2. Read Values Directly from Inputs to ensure freshness
+        const shopName = document.getElementById('shop-name').value;
+        const shopPolicy = document.getElementById('shop-policy').value;
+
+        // 3. Construct the Brain
+        let textBlob = `SHOP CONFIGURATION:\nName: ${shopName}\nPolicies: ${shopPolicy}\n\nCATALOG:\n`;
+        products.forEach(p => textBlob += `Item: ${p.name}, Price: ${p.price}, Details: ${p.desc}, Image: ${p.img}\n`);
+        
         textBlob += "\nPROMOTIONS:\n";
         promos.forEach(p => textBlob += `Promo: ${p.title} - ${p.desc}\n`);
 
@@ -323,7 +302,8 @@
                 body: JSON.stringify({ shop_data_text: textBlob })
             });
             if(res.ok) { msg.innerText = "✅ Brain Updated!"; setTimeout(()=>msg.innerText="", 3000); }
-        } catch(e) { msg.innerText = "Error connecting."; }
+            else { throw new Error(); }
+        } catch(e) { msg.innerText = "Error connecting to server."; }
         btn.innerText = "✨ Sync All to AI"; btn.disabled = false;
     }
 
