@@ -35,7 +35,7 @@
         <!-- LEFT COLUMN: MANAGERS (Inputs) -->
         <div class="left-panel">
             
-            <!-- 1. Shop Configuration (FIXED) -->
+            <!-- 1. Shop Configuration -->
             <div class="card form-card mb-20">
                 <h4>🏪 Shop Configuration</h4>
                 <div class="form-group">
@@ -138,7 +138,9 @@
 </div>
 
 <script>
-    const API_URL = "http://localhost:8000";
+    // FIXED: Use relative path (empty string) to prevent CORS issues.
+    // The browser will automatically use the current domain (e.g., localhost:8000 or your-app.railway.app)
+    const API_URL = ""; 
     
     // State
     let products = JSON.parse(localStorage.getItem('products')) || [];
@@ -163,7 +165,7 @@
         document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
     }
 
-    // --- SHOP INFO LOGIC (FIXED) ---
+    // --- SHOP INFO LOGIC ---
     function saveShopInfo() {
         const name = document.getElementById('shop-name').value;
         const policy = document.getElementById('shop-policy').value;

@@ -9,34 +9,38 @@ from .rag_engine import retrieve_context, rebuild_index
 from .llm_client import call_kolosal_api
 from .analytics import log_query, get_analytics_data, generate_recommendations
 from .file_processor import process_file
-from .database import mongo_db # Import the DB instance
+from .database import mongo_db 
 
 # Lifecycle Event to connect to DB
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    mongo_db.connect()
+    # Ensure we connect to Mongo on startup
+    try:
+        mongo_db.connect()
+    except Exception as e:
+        print(f"⚠️ Warning: Could not connect to MongoDB: {e}")
     yield
 
 app = FastAPI(lifespan=lifespan)
 
-# REMOVED: init_db()  <-- This line was causing the crash because it no longer exists
-
-# Global variable to store current shop text for recommendation logic
-# In a real app, this would be in a database, but memory is fine for this scale.
+# Global variable to store current shop text 
 current_shop_context = "" 
 
+# CORS Configuration - Allow All Origins for Development
+# This effectively disables CORS restrictions for API calls
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],  # Allow ALL origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow ALL methods (POST, GET, OPTIONS, etc.)
+    allow_headers=["*"],  # Allow ALL headers
 )
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
     try:
-        log_query(request.query) # Now writes to Mongo
-        context_text = retrieve_context(request.query) # Now reads from Elastic
+        log_query(request.query) 
+        context_text = retrieve_context(request.query) 
         
         if not context_text:
             context_text = "No shop data found."
@@ -54,19 +58,17 @@ async def update_knowledge(request: AdminUpdateRequest):
          raise HTTPException(status_code=400, detail="Data cannot be empty")
 
     try:
-        # Save text to memory for recommendation engine to check against
         current_shop_context = request.shop_data_text
-        
         rebuild_index(request.shop_data_text)
         return {"status": "success", "message": "Knowledge updated!"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Update Knowledge Error: {e}")
+        # Return 500 but log the specific error to console
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
-# --- NEW FILE UPLOAD ENDPOINT ---
 @app.post("/admin/upload_file")
 async def upload_file(file: UploadFile = File(...)):
     try:
-        # 1. Save File Temporarily
         temp_dir = "temp_uploads"
         os.makedirs(temp_dir, exist_ok=True)
         temp_path = os.path.join(temp_dir, file.filename)
@@ -74,10 +76,7 @@ async def upload_file(file: UploadFile = File(...)):
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # 2. Extract Text
         extracted_text = process_file(temp_path, file.filename)
-        
-        # 3. Cleanup
         os.remove(temp_path)
         
         if not extracted_text:
@@ -88,8 +87,6 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         print(f"Upload Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-# --- NEW ANALYTICS ENDPOINTS ---
 
 @app.get("/admin/analytics")
 async def get_stats():
