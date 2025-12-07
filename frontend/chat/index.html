@@ -5,14 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Support</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="chat.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="chat-window">
     <div class="header">
-        <h3 id="shop-title">Shop Assistant</h3>
-        <a href="admin.html" class="admin-link">Admin Login</a>
+        <div class="header-left">
+            <h3 id="shop-title">Shop Assistant</h3>
+            <a href="../admin/" class="admin-link">Admin Login</a>
+        </div>
+        <!-- TTS Toggle -->
+        <button id="tts-btn" class="icon-btn" onclick="toggleTTS()" title="Enable/Disable Text-to-Speech">
+            🔇
+        </button>
     </div>
     
     <div class="messages" id="history">
@@ -20,20 +26,117 @@
     </div>
     
     <div class="input-area">
+        <!-- Mic Button (Always Visible Now) -->
+        <button id="mic-btn" class="icon-btn mic-btn" onclick="toggleMic()" title="Speak">
+            🎤
+        </button>
+        
         <input type="text" id="query" placeholder="Ask about products..." onkeypress="if(event.key==='Enter') send()">
-        <button onclick="send()" id="send-btn">➤</button>
+        <button onclick="send()" id="send-btn" class="send-btn">➤</button>
     </div>
+    <div id="listening-indicator" style="display:none; text-align:center; font-size:0.8rem; color:red; padding-bottom:5px;">Listening...</div>
+    <div id="error-msg" style="text-align:center; font-size:0.75rem; color:#dc2626; padding: 0 10px;"></div>
 </div>
 
 <script>
     const API_URL = "http://localhost:8000";
+    let isTTSEnabled = false;
+    let recognition;
+    let synth = window.speechSynthesis;
 
-    // Load shop name from local storage just for the header title
+    // --- SETUP ON LOAD ---
     const shopInfo = JSON.parse(localStorage.getItem('shopInfo'));
     if(shopInfo && shopInfo.name) {
         document.getElementById('shop-title').innerText = shopInfo.name + " Support";
     }
 
+    // --- 1. SETUP SPEECH RECOGNITION (MIC) ---
+    // We check for browser support but DON'T hide the button if missing (so user knows why)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+
+        recognition.onstart = () => {
+            document.getElementById('listening-indicator').style.display = 'block';
+            document.getElementById('mic-btn').classList.add('mic-active');
+            document.getElementById('error-msg').innerText = "";
+        };
+        
+        recognition.onend = () => {
+            document.getElementById('listening-indicator').style.display = 'none';
+            document.getElementById('mic-btn').classList.remove('mic-active');
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            document.getElementById('query').value = transcript;
+            setTimeout(() => send(), 500); // Auto-send
+        };
+
+        recognition.onerror = (event) => {
+            document.getElementById('error-msg').innerText = "Mic Error: " + event.error;
+        };
+    }
+
+    function toggleMic() {
+        if (!recognition) {
+            alert("Your browser does not support Voice-to-Text.\nPlease use Chrome, Edge, or Safari.");
+            return;
+        }
+        try {
+            recognition.start();
+        } catch (e) {
+            // If already started, stop it
+            recognition.stop();
+        }
+    }
+
+    // --- 2. SETUP TEXT-TO-SPEECH (SPEAKER) ---
+    function toggleTTS() {
+        isTTSEnabled = !isTTSEnabled;
+        const btn = document.getElementById('tts-btn');
+        
+        if (isTTSEnabled) {
+            btn.innerText = "🔊"; // Unmuted Icon
+            btn.classList.add('active-speaker');
+            // Speak a test phrase to trigger permission
+            speak("Voice enabled", true); 
+        } else {
+            btn.innerText = "🔇"; // Muted Icon
+            btn.classList.remove('active-speaker');
+            synth.cancel();
+        }
+    }
+
+    function speak(text, force = false) {
+        if (!isTTSEnabled && !force) return;
+        
+        // Cancel any currently speaking text
+        synth.cancel();
+
+        // Remove HTML tags
+        const cleanText = text.replace(/<[^>]*>?/gm, '');
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        
+        // Try to find a good English voice
+        const voices = synth.getVoices();
+        const preferredVoice = voices.find(v => v.lang.includes('en-US') && !v.name.includes('Google')) || voices[0];
+        if (preferredVoice) utterance.voice = preferredVoice;
+
+        utterance.rate = 1.0; 
+        synth.speak(utterance);
+    }
+
+    // Ensure voices are loaded (Chrome sometimes loads them async)
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = () => { console.log("Voices loaded"); };
+    }
+
+    // --- CHAT LOGIC ---
     async function send() {
         const input = document.getElementById('query');
         const text = input.value.trim();
@@ -47,7 +150,7 @@
         input.value = '';
         history.scrollTop = history.scrollHeight;
 
-        // 2. Loading State
+        // 2. Loading
         const loadId = 'loading-' + Date.now();
         history.innerHTML += `<div id="${loadId}" class="msg bot">...</div>`;
         history.scrollTop = history.scrollHeight;
@@ -61,16 +164,18 @@
             });
             const data = await res.json();
             
-            // 3. Render Bot Response
             document.getElementById(loadId).remove();
             
-            // Convert URLs to Images
+            // Format Images
             let formattedHtml = data.answer.replace(
                 /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp))/gi, 
                 '<img src="$1" alt="Product Image">'
             );
             
             history.innerHTML += `<div class="msg bot">${formattedHtml}</div>`;
+            
+            // 3. Speak Answer
+            speak(data.answer);
 
         } catch (e) {
             document.getElementById(loadId).innerText = "Error connecting to shop server.";
