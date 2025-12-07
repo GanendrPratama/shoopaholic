@@ -31,4 +31,6 @@ RUN uv pip install --system --no-cache -r requirements.txt
 COPY . .
 
 # 8. Run
+# Use shell form to ensure variable expansion works correctly
+# Explicitly bind to 0.0.0.0 which is required for Railway/Docker networking
 CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
