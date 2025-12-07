@@ -2,7 +2,8 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from .schemas import ChatRequest, AdminUpdateRequest
+from .config import ADMIN_USERNAME, ADMIN_PASSWORD
+from .schemas import ChatRequest, AdminUpdateRequest, LoginRequest
 from .rag_engine import retrieve_context, rebuild_index
 from .llm_client import call_kolosal_api
 from .analytics import init_db, log_query, get_analytics_data, generate_recommendations
@@ -22,6 +23,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- LOGIN ENDPOINT ---
+@app.post("/admin/login")
+async def admin_login(creds: LoginRequest):
+    # Verify against environment variables
+    if creds.username == ADMIN_USERNAME and creds.password == ADMIN_PASSWORD:
+        return {"status": "success", "message": "Logged in"}
+    
+    # Return 401 Unauthorized if failed
+    raise HTTPException(status_code=401, detail="Invalid credentials")
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
