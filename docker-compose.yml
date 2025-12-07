@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # 1. The Shop Assistant App
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - KOLOSAI_API_KEY=${KOLOSAI_API_KEY}
+      - MONGO_URI=mongodb://mongo:27017
+      - ELASTIC_URL=http://elasticsearch:9200
+    depends_on:
+      - mongo
+      - elasticsearch
+
+  # 2. MongoDB (NoSQL Storage)
+  mongo:
+    image: mongo:6.0
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+
+  # 3. Elasticsearch (Vector Search Engine)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"  # Limit memory usage
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+volumes:
+  mongo_data:
+  es_data:

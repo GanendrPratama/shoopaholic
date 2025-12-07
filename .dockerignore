@@ -1,0 +1,21 @@
+Ignore git history
+
+.git/
+
+Ignore local storage (let the cloud build fresh)
+
+storage/
+*.db
+*.sqlite
+
+Ignore python cache
+
+pycache/
+*.pyc
+*.pyo
+*.pyd
+
+Ignore env files (Railway injects variables safely)
+
+.env
+venv/

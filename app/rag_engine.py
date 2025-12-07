@@ -1,45 +1,55 @@
 import os
-import shutil
-from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext, load_index_from_storage
+from llama_index.core import VectorStoreIndex, Document, StorageContext, Settings
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from .config import STORAGE_DIR
+from llama_index.vector_stores.elasticsearch import ElasticsearchStore
 
-# Global Settings
+# Config
+ELASTIC_URL = os.getenv("ELASTIC_URL", "http://localhost:9200")
+INDEX_NAME = "shoopaholic_vectors"
+
+# Global Settings (Embedding Model)
 Settings.llm = None
 Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
-def load_knowledge_base():
-    if not os.path.exists(STORAGE_DIR):
-        return None
-    try:
-        # Check if the mandatory index files actually exist
-        if not os.path.exists(os.path.join(STORAGE_DIR, "docstore.json")):
-            return None
-            
-        storage_context = StorageContext.from_defaults(persist_dir=STORAGE_DIR)
-        return load_index_from_storage(storage_context)
-    except Exception as e:
-        print(f"Error loading index: {e}")
-        return None
+def get_vector_store():
+    """Connects to Elasticsearch"""
+    return ElasticsearchStore(
+        es_url=ELASTIC_URL,
+        index_name=INDEX_NAME,
+    )
 
 def retrieve_context(query: str, top_k: int = 3) -> str:
-    index = load_knowledge_base()
-    if not index:
+    try:
+        vector_store = get_vector_store()
+        
+        # Load index from existing vector store
+        index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+        
+        retriever = index.as_retriever(similarity_top_k=top_k)
+        nodes = retriever.retrieve(query)
+        
+        return "\n\n".join([node.get_content() for node in nodes])
+    except Exception as e:
+        print(f"⚠️ Retrieval Error (Is Elastic running?): {e}")
         return ""
 
-    retriever = index.as_retriever(similarity_top_k=top_k)
-    nodes = retriever.retrieve(query)
-    return "\n\n".join([node.get_content() for node in nodes])
-
 def rebuild_index(text_data: str):
-    # Ensure storage directory exists
-    if not os.path.exists(STORAGE_DIR):
-        os.makedirs(STORAGE_DIR)
-
-    # Note: We don't delete the whole dir anymore to avoid killing the analytics DB
-    # LlamaIndex will overwrite the vector files automatically
-    
-    documents = [Document(text=text_data)]
-    index = VectorStoreIndex.from_documents(documents)
-    index.storage_context.persist(persist_dir=STORAGE_DIR)
-    return True
+    try:
+        vector_store = get_vector_store()
+        
+        # Create documents
+        documents = [Document(text=text_data)]
+        
+        # Create storage context pointing to Elastic
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        
+        # This automatically embeds the text and sends it to Elasticsearch
+        VectorStoreIndex.from_documents(
+            documents, 
+            storage_context=storage_context
+        )
+        print("✅ Data indexed in Elasticsearch")
+        return True
+    except Exception as e:
+        print(f"❌ Indexing Error: {e}")
+        raise e

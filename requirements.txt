@@ -5,11 +5,9 @@ requests
 llama-index-core
 llama-index-embeddings-huggingface
 llama-index-readers-file
+llama-index-vector-stores-elasticsearch
 sentence-transformers
 protobuf
 python-multipart
-pypdf
-pytesseract
-pdf2image
-SpeechRecognition
-pydub
+pymongo
+elasticsearch
