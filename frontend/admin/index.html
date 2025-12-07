@@ -170,8 +170,6 @@
     const ITEMS_PER_PAGE = 3;
 
     window.onload = () => {
-        checkSession(); // Auth Check
-
         // Load Shop Info correctly
         const info = JSON.parse(localStorage.getItem('shopInfo')) || { name: "", policy: "" };
         document.getElementById('shop-name').value = info.name;
@@ -181,66 +179,11 @@
         loadAnalytics();
     };
 
-    // --- AUTH LOGIC (Updated to call Backend) ---
-    function checkSession() {
-        const isLoggedIn = sessionStorage.getItem('shoop_admin_auth');
-        if (isLoggedIn === 'true') {
-            document.getElementById('login-overlay').style.display = 'none';
-        } else {
-            document.getElementById('login-overlay').style.display = 'flex';
-        }
-    }
-
-    async function attemptLogin() {
-        const u = document.getElementById('login-user').value;
-        const p = document.getElementById('login-pass').value;
-        const err = document.getElementById('login-error');
-        const btn = document.querySelector('#login-overlay button');
-
-        btn.disabled = true;
-        btn.innerText = "Checking...";
-
-        try {
-            // Call the backend API
-            const res = await fetch(`${API_URL}/admin/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: u, password: p })
-            });
-
-            if (res.ok) {
-                // Success
-                sessionStorage.setItem('shoop_admin_auth', 'true');
-                document.getElementById('login-overlay').style.display = 'none';
-                err.style.display = 'none';
-            } else {
-                // Failed (401 or other)
-                err.style.display = 'block';
-                err.innerText = "❌ Invalid credentials";
-            }
-        } catch (e) {
-            console.warn("Backend not reachable. Checking fallback credentials.");
-            // Fallback for Demo/Preview where Backend is offline
-            // This allows you to login in the preview even if the Python server isn't running
-            if (u === 'admin' && p === 'Kolosal') {
-                sessionStorage.setItem('shoop_admin_auth', 'true');
-                document.getElementById('login-overlay').style.display = 'none';
-                err.style.display = 'none';
-            } else {
-                err.style.display = 'block';
-                err.innerText = "❌ Connection Error (Backend offline)";
-            }
-        }
-        
-        btn.disabled = false;
-        btn.innerText = "Sign In";
-    }
-
     function scrollToSection(id) {
         document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
     }
 
-    // --- SHOP INFO LOGIC ---
+    // --- SHOP INFO LOGIC (FIXED) ---
     function saveShopInfo() {
         const name = document.getElementById('shop-name').value;
         const policy = document.getElementById('shop-policy').value;
@@ -352,16 +295,19 @@
         }).join('');
     }
 
-    // --- SYNC LOGIC ---
+    // --- SYNC LOGIC (FIXED) ---
     async function syncToAI() {
         const btn = document.querySelector('.btn-success');
         const msg = document.getElementById('status-msg');
         
+        // 1. Force Save Current Shop Info (The Fix)
         saveShopInfo();
         
+        // 2. Read Values Directly from Inputs to ensure freshness
         const shopName = document.getElementById('shop-name').value;
         const shopPolicy = document.getElementById('shop-policy').value;
 
+        // 3. Construct the Brain
         let textBlob = `SHOP CONFIGURATION:\nName: ${shopName}\nPolicies: ${shopPolicy}\n\nCATALOG:\n`;
         products.forEach(p => textBlob += `Item: ${p.name}, Price: ${p.price}, Details: ${p.desc}, Image: ${p.img}\n`);
         
