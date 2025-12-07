@@ -11,3 +11,8 @@ protobuf
 python-multipart
 pymongo
 elasticsearch
+pytesseract
+pypdf
+pdf2image
+SpeechRecognition
+pydub

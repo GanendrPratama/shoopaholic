@@ -2,11 +2,18 @@ import os
 import shutil
 from pathlib import Path
 import pypdf
-import pytesseract
-from pdf2image import convert_from_path
 from PIL import Image
 import speech_recognition as sr
 from pydub import AudioSegment
+
+# Wrap external tools in try-except to prevent app crash if tools are missing
+try:
+    import pytesseract
+    from pdf2image import convert_from_path
+except ImportError:
+    pytesseract = None
+    convert_from_path = None
+    print("⚠️ Warning: OCR tools not fully installed. Image/PDF extraction might be limited.")
 
 # Helper to check extensions
 ALLOWED_EXTENSIONS = {'.txt', '.pdf', '.png', '.jpg', '.jpeg', '.mp4', '.mp3', '.wav'}
@@ -44,10 +51,13 @@ def extract_pdf(path):
         
         # If text is too short, it might be a scanned PDF -> Use OCR
         if len(text) < 50:
-            print("PDF seems scanned. Switching to OCR...")
-            images = convert_from_path(path)
-            for img in images:
-                text += pytesseract.image_to_string(img) + "\n"
+            if pytesseract and convert_from_path:
+                print("PDF seems scanned. Switching to OCR...")
+                images = convert_from_path(path)
+                for img in images:
+                    text += pytesseract.image_to_string(img) + "\n"
+            else:
+                return "[Error: OCR tools missing. Cannot read scanned PDF.]"
                 
     except Exception as e:
         print(f"PDF Error: {e}")
@@ -56,6 +66,8 @@ def extract_pdf(path):
     return text
 
 def extract_image_ocr(path):
+    if not pytesseract:
+        return "[Error: pytesseract library not installed]"
     try:
         image = Image.open(path)
         return pytesseract.image_to_string(image)
